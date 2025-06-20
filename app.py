@@ -1,37 +1,51 @@
 import streamlit as st
+import gdown
 import joblib
 import re
+import os
 
-# Step 1: Load the trained model
-model = joblib.load("malicious_url_model.pkl")
+# === Setup ===
 
-# Step 2: Define suspicious keywords
+# Model file setup
+MODEL_PATH = "malicious_url_model.pkl"
+FILE_ID = "1GmSMUAo_5OfIKlYixjUDTpc7OJ_kWweU"  # ⛔ Replace with your actual Google Drive File ID
+
+# Download the model if not already downloaded
+if not os.path.exists(MODEL_PATH):
+    st.info("Downloading model from Google Drive...")
+    gdown.download(f"https://drive.google.com/uc?id={FILE_ID}", MODEL_PATH, quiet=False)
+
+# Load model
+model = joblib.load(MODEL_PATH)
+
+# Suspicious keywords to detect
 suspicious_keywords = ['login', 'verify', 'update', 'free', 'bonus', 'secure', 'account']
 
-# Step 3: Feature extraction from a single URL
+# === Feature extraction function ===
 def extract_features(url):
-    features = {}
-    features['url_length'] = len(url)
-    features['num_dots'] = url.count('.')
-    features['num_hyphens'] = url.count('-')
-    features['has_https'] = 1 if url.startswith("https") else 0
-    ip_pattern = r'http[s]?://(?:\d{1,3}\.){3}\d{1,3}'
-    features['has_ip'] = 1 if re.match(ip_pattern, url) else 0
-    features['has_suspicious_keyword'] = 1 if any(word in url.lower() for word in suspicious_keywords) else 0
-    return [list(features.values())]  # return as list of list for prediction
+    features = {
+        'url_length': len(url),
+        'num_dots': url.count('.'),
+        'num_hyphens': url.count('-'),
+        'has_https': 1 if url.startswith("https") else 0,
+        'has_ip': 1 if re.match(r'http[s]?://(?:\d{1,3}\.){3}\d{1,3}', url) else 0,
+        'has_suspicious_keyword': 1 if any(word in url.lower() for word in suspicious_keywords) else 0
+    }
+    return [list(features.values())]
 
-# Step 4: Streamlit UI
+# === Streamlit UI ===
 st.title("🔍 Malicious URL Detector")
-st.write("Enter a URL and check if it’s safe or malicious.")
+st.write("Enter a URL to check if it's safe or potentially malicious.")
 
-# Input box
-user_input = st.text_input("Enter URL")
+# URL input
+user_input = st.text_input("Enter a URL:")
 
+# Predict button
 if st.button("Check"):
     if user_input:
-        input_features = extract_features(user_input)
-        prediction = model.predict(input_features)[0]
-
+        features = extract_features(user_input)
+        prediction = model.predict(features)[0]
+        
         if prediction == 1:
             st.error("⚠️ This URL is MALICIOUS!")
         else:
